@@ -37,6 +37,14 @@ class CreateRoundRequest(BaseModel):
 class DeleteRoundRequest(BaseModel):
     round_id: int
 
+class PlayerStatsResponse(BaseModel):
+    player_id: int
+    rounds_played: int
+    rounds_won: int
+    win_ratio: float
+    total_points: int
+    average_points: float
+
 
 @app.get("/")
 def root():
@@ -98,22 +106,48 @@ def delete_round(data: DeleteRoundRequest):
         "deleted_round_id": data.round_id
     }
 
-@app.get("/players/{player_id}/stats")
-def player_stats(player_id: int):
+@app.get("/players/{player_id}/stats", response_model=PlayerStatsResponse)
+def get_player_stats(player_id: int):
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT
                     COUNT(*) AS rounds_played,
-                    COALESCE(SUM(points), 0) AS total_points,
-                    COALESCE(AVG(points), 0) AS avg_points
-                FROM round_players
-                WHERE player_id = %s
+                    SUM(
+                        CASE WHEN rp.team = r.winning_team THEN 1 ELSE 0 END
+                    ) AS rounds_won,
+                    COALESCE(SUM(rp.points), 0) AS total_points,
+                    COALESCE(AVG(rp.points), 0) AS average_points
+                FROM round_players rp
+                JOIN rounds r ON r.id = rp.round_id
+                WHERE rp.player_id = %s
+                  AND r.winning_team IS NOT NULL
                 """,
                 (player_id,)
             )
-            return cur.fetchone()
+            stats = cur.fetchone()
+
+    if stats["rounds_played"] == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Player has no completed rounds"
+        )
+
+    win_ratio = (
+        stats["rounds_won"] / stats["rounds_played"]
+        if stats["rounds_played"] > 0
+        else 0
+    )
+
+    return {
+        "player_id": player_id,
+        "rounds_played": stats["rounds_played"],
+        "rounds_won": stats["rounds_won"],
+        "win_ratio": round(win_ratio, 2),
+        "total_points": stats["total_points"],
+        "average_points": round(stats["average_points"], 2)
+    }
         
 @app.get("/players")
 def get_players():
