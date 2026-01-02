@@ -16,7 +16,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 def get_conn():
     return psycopg2.connect(
-        user=DB_HOST,
+        user=DB_USER,
         password=DB_PASSWORD,
         host=DB_HOST,
         port=DB_PORT,
@@ -29,10 +29,13 @@ class RoundPlayer(BaseModel):
     points: int
     reservation: str
 
-class CreateRound(BaseModel):
+class CreateRoundRequest(BaseModel):
     played_at: str
     winning_team: str
     players: list[RoundPlayer]
+
+class DeleteRoundRequest(BaseModel):
+    round_id: int
 
 
 @app.get("/")
@@ -41,7 +44,7 @@ def root():
 
 
 @app.post("/rounds")
-def create_round(data: CreateRound):
+def create_round(data: CreateRoundRequest):
     if len(data.players) != 4:
         raise HTTPException(400, "Exactly 4 players required")
 
@@ -63,7 +66,37 @@ def create_round(data: CreateRound):
                     (round_id, p.player_id, p.team, p.points, p.reservation)
                 )
 
-    return {"round_id": round_id}
+    return {
+        "status": "ok",
+        "round_id": round_id
+    }
+
+
+@app.post("/rounds/delete")
+def delete_round(data: DeleteRoundRequest):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            # Check if round exists
+            cur.execute(
+                "SELECT 1 FROM rounds WHERE id = %s",
+                (data.round_id,)
+            )
+            if cur.fetchone() is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Round not found"
+                )
+
+            # Delete round (round_players will cascade)
+            cur.execute(
+                "DELETE FROM rounds WHERE id = %s",
+                (data.round_id,)
+            )
+
+    return {
+        "status": "ok",
+        "deleted_round_id": data.round_id
+    }
 
 @app.get("/players/{player_id}/stats")
 def player_stats(player_id: int):
