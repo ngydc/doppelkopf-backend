@@ -114,3 +114,18 @@ def player_stats(player_id: int):
                 (player_id,)
             )
             return cur.fetchone()
+        
+@app.get("/players")
+def get_players():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, name
+                FROM players
+                ORDER BY name
+                """
+            )
+            players = cur.fetchall()
+
+    return players
