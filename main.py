@@ -45,6 +45,13 @@ class PlayerStatsResponse(BaseModel):
     total_points: int
     average_points: float
 
+class PlayerProgressionResponse(BaseModel):
+    player_id: int
+    round_id: int
+    dates: list[str]
+    progression: list[int]
+
+
 
 @app.get("/")
 def root():
@@ -163,3 +170,34 @@ def get_players():
             players = cur.fetchall()
 
     return players
+
+
+@app.get("/players/{player_id}/progression", response_model=PlayerProgressionResponse)
+def get_player_progression(player_id: int):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    r.id AS round_id,
+                    r.played_at as played_at,
+                    SUM(rp.points) OVER (
+                        ORDER BY r.played_at, r.id
+                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                    ) AS progression
+                FROM round_players rp
+                JOIN rounds r ON r.id = rp.round_id
+                WHERE rp.player_id = %s
+                ORDER BY r.played_at, r.id;
+                """,
+                (player_id,)
+            )
+            playerProgression = cur.fetchone()
+
+
+    return {
+        "player_id": player_id,
+        "round_id": playerProgression["round_id"],
+        "played_at": playerProgression["played_at"],
+        "progression": playerProgression["progression"]
+    }
