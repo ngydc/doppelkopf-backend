@@ -5,6 +5,7 @@ from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 import os
 from typing import List
+from datetime import date
 
 app = FastAPI()
 
@@ -49,7 +50,7 @@ class PlayerStatsResponse(BaseModel):
 class PlayerProgressionResponse(BaseModel):
     player_id: int
     round_id: List[int]
-    played_at: List[str]
+    played_at: List[date]
     progression: List[int]
 
 
