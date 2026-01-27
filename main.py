@@ -48,7 +48,7 @@ class PlayerStatsResponse(BaseModel):
 class PlayerProgressionResponse(BaseModel):
     player_id: int
     round_id: int
-    dates: list[str]
+    played_at: list[str]
     progression: list[int]
 
 
