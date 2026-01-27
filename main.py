@@ -4,6 +4,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 import os
+from typing import List
 
 app = FastAPI()
 
@@ -47,9 +48,9 @@ class PlayerStatsResponse(BaseModel):
 
 class PlayerProgressionResponse(BaseModel):
     player_id: int
-    round_id: int
-    played_at: list[str]
-    progression: list[int]
+    round_id: List[int]
+    played_at: List[str]
+    progression: List[int]
 
 
 
@@ -180,7 +181,7 @@ def get_player_progression(player_id: int):
                 """
                 SELECT
                     r.id AS round_id,
-                    r.played_at as played_at,
+                    r.played_at,
                     SUM(rp.points) OVER (
                         ORDER BY r.played_at, r.id
                         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
@@ -192,12 +193,12 @@ def get_player_progression(player_id: int):
                 """,
                 (player_id,)
             )
-            playerProgression = cur.fetchone()
 
+            rows = cur.fetchall()
 
     return {
         "player_id": player_id,
-        "round_id": playerProgression["round_id"],
-        "played_at": playerProgression["played_at"],
-        "progression": playerProgression["progression"]
+        "round_id": [row[0] for row in rows],
+        "played_at": [row[1] for row in rows],
+        "progression": [row[2] for row in rows],
     }
