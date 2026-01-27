@@ -199,7 +199,7 @@ def get_player_progression(player_id: int):
 
     return {
         "player_id": player_id,
-        "round_id": [row[0] for row in rows],
-        "played_at": [row[1] for row in rows],
-        "progression": [row[2] for row in rows],
+        "round_id": [row["round_id"] for row in rows],
+        "played_at": [row["played_at"] for row in rows],
+        "progression": [row["progression"] for row in rows],
     }
