@@ -1,0 +1,22 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.HOST_DEPLOY }}
+          username: ubuntu
+          key: ${{ secrets.SSH_DEPLOY }}
+          script: |
+            cd doppelkopf-backend
+            git pull origin main
+            sudo systemctl restart fastapi
