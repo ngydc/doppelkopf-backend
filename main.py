@@ -4,8 +4,9 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 import os
-from typing import List
+from typing import List, Optional
 from datetime import date
+from fastapi import Query
 
 app = FastAPI()
 
@@ -175,26 +176,43 @@ def get_players():
 
 
 @app.get("/players/{player_id}/progression", response_model=PlayerProgressionResponse)
-def get_player_progression(player_id: int):
+def get_player_progression(
+    player_id: int,
+    start: Optional[date] = Query(None),
+    end: Optional[date] = Query(None)
+):
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT
-                    r.id AS round_id,
-                    r.played_at,
-                    SUM(rp.points) OVER (
-                        ORDER BY r.played_at, r.id
-                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-                    ) AS progression
-                FROM round_players rp
-                JOIN rounds r ON r.id = rp.round_id
-                WHERE rp.player_id = %s
-                ORDER BY r.played_at, r.id;
-                """,
-                (player_id,)
-            )
 
+            query = """
+                SELECT *
+                FROM (
+                    SELECT
+                        r.id AS round_id,
+                        r.played_at,
+                        SUM(rp.points) OVER (
+                            ORDER BY r.played_at, r.id
+                        ) AS progression
+                    FROM round_players rp
+                    JOIN rounds r ON r.id = rp.round_id
+                    WHERE rp.player_id = %s
+                ) sub
+                WHERE 1=1
+            """
+
+            params = [player_id]
+
+            if start:
+                query += " AND sub.played_at >= %s"
+                params.append(start)
+
+            if end:
+                query += " AND sub.played_at <= %s"
+                params.append(end)
+
+            query += " ORDER BY sub.played_at, sub.round_id;"
+
+            cur.execute(query, tuple(params))
             rows = cur.fetchall()
 
     return {
