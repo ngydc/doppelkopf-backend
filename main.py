@@ -184,9 +184,8 @@ def get_player_progression(
     with get_conn() as conn:
         with conn.cursor() as cur:
 
-            query = """
-                SELECT *
-                FROM (
+            base_cte = """
+                WITH full_progression AS (
                     SELECT
                         r.id AS round_id,
                         r.played_at,
@@ -196,21 +195,52 @@ def get_player_progression(
                     FROM round_players rp
                     JOIN rounds r ON r.id = rp.round_id
                     WHERE rp.player_id = %s
-                ) sub
-                WHERE 1=1
+                )
             """
 
             params = [player_id]
 
-            if start:
-                query += " AND sub.played_at >= %s"
-                params.append(start)
+            # Case 1: No start date → just filter normally (or return all)
+            if start is None:
+                query = base_cte + """
+                    SELECT *
+                    FROM full_progression
+                    WHERE 1=1
+                """
 
-            if end:
-                query += " AND sub.played_at <= %s"
-                params.append(end)
+                if end:
+                    query += " AND played_at <= %s"
+                    params.append(end)
 
-            query += " ORDER BY sub.played_at, sub.round_id;"
+                query += " ORDER BY played_at, round_id;"
+
+            else:
+                # Case 2: start exists → include anchor row
+                query = base_cte + """
+                    (
+                        SELECT *
+                        FROM full_progression
+                        WHERE played_at < %s
+                        ORDER BY played_at DESC, round_id DESC
+                        LIMIT 1
+                    )
+                    UNION ALL
+                    (
+                        SELECT *
+                        FROM full_progression
+                        WHERE played_at >= %s
+                """
+
+                params.extend([start, start])
+
+                if end:
+                    query += " AND played_at <= %s"
+                    params.append(end)
+
+                query += """
+                    )
+                    ORDER BY played_at, round_id;
+                """
 
             cur.execute(query, tuple(params))
             rows = cur.fetchall()
