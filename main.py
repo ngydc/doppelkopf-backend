@@ -5,7 +5,7 @@ from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 import os
 from typing import List, Optional
-from datetime import date
+from datetime import datetime
 from fastapi import Query
 
 app = FastAPI()
@@ -33,7 +33,6 @@ class RoundPlayer(BaseModel):
     reservation: str
 
 class CreateRoundRequest(BaseModel):
-    played_at: str
     winning_team: str
     players: list[RoundPlayer]
 
@@ -51,7 +50,7 @@ class PlayerStatsResponse(BaseModel):
 class PlayerProgressionResponse(BaseModel):
     player_id: int
     round_id: List[int]
-    played_at: List[date]
+    played_at: List[datetime]
     progression: List[int]
 
 
@@ -69,8 +68,8 @@ def create_round(data: CreateRoundRequest):
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO rounds (played_at, winning_team) VALUES (%s, %s) RETURNING id",
-                (data.played_at, data.winning_team)
+                "INSERT INTO rounds (played_at, winning_team) VALUES (%s) RETURNING id",
+                (data.winning_team)
             )
             round_id = cur.fetchone()["id"]
 
@@ -178,8 +177,8 @@ def get_players():
 @app.get("/players/{player_id}/progression", response_model=PlayerProgressionResponse)
 def get_player_progression(
     player_id: int,
-    start: Optional[date] = Query(None),
-    end: Optional[date] = Query(None)
+    start: Optional[datetime] = Query(None),
+    end: Optional[datetime] = Query(None)
 ):
     with get_conn() as conn:
         with conn.cursor() as cur:
