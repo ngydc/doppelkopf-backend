@@ -68,7 +68,7 @@ def create_round(data: CreateRoundRequest):
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO rounds (played_at, winning_team) VALUES (%s) RETURNING id",
+                "INSERT INTO rounds (winning_team) VALUES (%s) RETURNING id",
                 (data.winning_team)
             )
             round_id = cur.fetchone()["id"]
